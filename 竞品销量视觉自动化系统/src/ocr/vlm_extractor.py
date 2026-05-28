@@ -185,6 +185,38 @@ class VLMExtractor:
         except Exception:
             return False
 
+    # ── V5.0 优化：Tile 格栅裁剪 ──────────────────────────────
+
+    @staticmethod
+    def resize_for_vlm(image, max_pixels: int = 512):
+        """VLM 推理前强制下采样，限制 Token 数量。
+
+        1080P 弹窗截图 → 等比例缩放至 max_pixels 边长，
+        防止 ViT 动态分 Tile 撑爆显存。
+        """
+        try:
+            import cv2
+            h, w = image.shape[:2]
+            scale = max_pixels / max(h, w)
+            if scale < 1.0:
+                return cv2.resize(image, (int(w * scale), int(h * scale)))
+        except ImportError:
+            pass
+        return image
+
+    @staticmethod
+    def encode_image_for_vlm(image, max_pixels: int = 512) -> bytes:
+        """将图像编码为 VLM API 可接受的 base64 字节流。
+
+        先下采样再编码为 JPEG（压缩质量 85%），平衡清晰度与传输体积。
+        """
+        import base64
+        import cv2
+
+        resized = VLMExtractor.resize_for_vlm(image, max_pixels)
+        _, buf = cv2.imencode(".jpg", resized, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        return base64.b64encode(buf).decode("utf-8")
+
     @property
     def stats(self) -> dict:
         return {

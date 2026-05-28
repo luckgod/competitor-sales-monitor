@@ -1,4 +1,4 @@
-"""ADB 协议与 scrcpy 投屏引擎控制 — 物理层通信总控。"""
+"""ADB 协议与 scrcpy 投屏引擎控制 - 物理层通信总控。"""
 import logging
 import random
 import subprocess
@@ -8,13 +8,11 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class DeviceInfo:
     serial: str
     model: str = ""
     android_version: str = ""
-
 
 class ADBController:
     """封装 ADB 指令与 scrcpy 进程生命周期管理。"""
@@ -25,6 +23,18 @@ class ADBController:
         self._scrcpy = scrcpy_path
         self._serial = device_serial
         self._scrcpy_proc: subprocess.Popen | None = None
+
+    # ── 设备检测 ──────────────────────────────────────────────
+
+    def restart_server(self) -> None:
+        """重启 ADB 服务端，用于看门狗断线自愈。"""
+        self._run_adb(["kill-server"])
+        time.sleep(1) 
+        self._run_adb(["start-server"])
+
+    def reconnect_device(self, device_ip: str, timeout: int = 10) -> None:
+        """无线 ADB 连接指定 IP 设备（看门狗兜底）。"""
+        self._run_adb(["connect", device_ip], timeout=timeout)
 
     # ── 设备检测 ──────────────────────────────────────────────
 
@@ -68,29 +78,68 @@ class ADBController:
 
     # ── scrcpy 投屏 ───────────────────────────────────────────
 
+    def setup_stealth_tunnel(self) -> str | None:
+        """V5.0 优化：斩断反向隧道特征 — 用 adb forward + 随机端口替代 reverse。
+
+        Returns:
+            本地转发端口号，失败返回 None。
+        """
+        import random as _random
+        local_port = _random.randint(21000, 28000)
+        abstract_name = f"sc_{_random.randint(100000, 999999)}"
+
+        # 清除旧 forward
+        self._run_adb(["forward", "--remove-all"], timeout=5)
+
+        # 正向端口转发：localabstract 不留 TCP 监听痕迹
+        result = self._run_adb(
+            ["forward", f"tcp:{local_port}", f"localabstract:{abstract_name}"],
+            timeout=5,
+        )
+        if "error" in result.lower():
+            logger.warning("正向端口转发失败: %s", result)
+            return None
+
+        logger.info("隐匿隧道已建立: localhost:%d → %s", local_port, abstract_name)
+        return str(local_port)
+
     def launch_scrcpy(self, max_size: int = 1080, max_fps: int = 15,
-                      bit_rate: str = "8M", stay_awake: bool = True) -> subprocess.Popen:
-        """启动 scrcpy 视频流进程，返回 Popen 对象。"""
+                      bit_rate: str = "8M", stay_awake: bool = True,
+                      stealth_mode: bool = True) -> subprocess.Popen:
+        """启动 scrcpy 视频流进程。
+
+        Args:
+            stealth_mode: True 时使用正向端口转发替代默认反向隧道（V5.0 反端口审计）。
+        """
         self.kill_scrcpy()
+
+        tunnel_port = None
+        if stealth_mode:
+            tunnel_port = self.setup_stealth_tunnel()
+
         args = [
             self._scrcpy,
             f"--max-size={max_size}",
             f"--max-fps={max_fps}",
             f"--video-bit-rate={bit_rate}",
             "--no-audio",
-            "--no-window",
-            "--no-playback",
-            "--no-control",
-            "--raw-video-stream",
+            "--stay-awake",
+            "--disable-screensaver",
         ]
+
+        if tunnel_port:
+            args.extend(["--tcpip=127.0.0.1:" + tunnel_port])
         if stay_awake:
             args.append("--stay-awake")
         if self._serial:
             args.extend(["--serial", self._serial])
 
-        logger.info("启动 scrcpy: %s", " ".join(args))
+        logger.info("启动 scrcpy (隐匿模式=%s): %s", stealth_mode, " ".join(args))
         self._scrcpy_proc = subprocess.Popen(
-            args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            args,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if hasattr(subprocess, 'CREATE_NEW_PROCESS_GROUP') else 0,
         )
         return self._scrcpy_proc
 
@@ -105,9 +154,20 @@ class ADBController:
 
     @property
     def scrcpy_alive(self) -> bool:
-        if self._scrcpy_proc is None:
+        """检查 scrcpy 进程是否真实存活（通过进程名查，不受 Popen 句柄漂移影响）。"""
+        if self._scrcpy_proc is not None:
+            if self._scrcpy_proc.poll() is None:
+                return True
+        # 兜底：直接按进程名查找
+        import subprocess as _sp
+        try:
+            result = _sp.run(
+                ["tasklist", "/FI", "IMAGENAME eq scrcpy.exe", "/NH"],
+                capture_output=True, text=True, timeout=5
+            )
+            return "scrcpy.exe" in result.stdout
+        except Exception:
             return False
-        return self._scrcpy_proc.poll() is None
 
     # ── 屏幕控制 ──────────────────────────────────────────────
 
@@ -153,7 +213,7 @@ class ADBController:
     def bezier_swipe(self, x1: int, y1: int, x2: int, y2: int,
                      duration_ms: int | None = None,
                      jitter: int = 15) -> None:
-        """贝塞尔曲线仿生滑动 — 模拟人类手指的加速/减速/抖动轨迹。
+        """贝塞尔曲线仿生滑动 - 模拟人类手指的加速/减速/抖动轨迹。
 
         通过分段 ADB swipe 命令组合成一条带随机偏移的曲线路径。
         每段耗时按缓入缓出分布。

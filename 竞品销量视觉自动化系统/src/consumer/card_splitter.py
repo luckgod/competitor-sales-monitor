@@ -112,7 +112,10 @@ class CardSplitter:
             })
 
         # 按 y 坐标排序（从上到下），同行的按 x 排序
-        cards.sort(key=lambda c: (c["y"] // 50, c["x"]))
+        # 动态分桶：用平均卡片高度的 1/3 作为行容差，适配不同 UI 布局
+        avg_h = sum(c["h"] for c in cards) / max(len(cards), 1)
+        row_tolerance = max(int(avg_h / 3), 10)
+        cards.sort(key=lambda c: (c["y"] // row_tolerance, c["x"]))
 
         return [self._extract_regions(frame, c) for c in cards]
 

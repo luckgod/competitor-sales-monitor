@@ -10,6 +10,7 @@
 import logging
 import signal
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -108,9 +109,6 @@ def main():
 
     signal.signal(signal.SIGINT, _shutdown)
     signal.signal(signal.SIGTERM, _shutdown)
-
-    import threading
-    # 信号处理器只能在主线程注册，这里确保 threading.Event 可用
 
     # ── 启动各组件 ────────────────────────────────────────────
     logger.info("检查设备连接状态...")

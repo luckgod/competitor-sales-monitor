@@ -103,13 +103,11 @@ class Watchdog:
     def _recover_device(self) -> None:
         """恢复 ADB 设备连接。"""
         logger.info("执行 ADB 重连: kill-server → start-server")
-        self._adb._run_adb(["kill-server"])
-        time.sleep(1)
-        self._adb._run_adb(["start-server"])
+        self._adb.restart_server()
 
         if self._wireless_fallback and self._device_ip:
             logger.info("尝试无线 ADB 兜底: connect %s", self._device_ip)
-            self._adb._run_adb(["connect", self._device_ip], timeout=10)
+            self._adb.reconnect_device(self._device_ip)
 
         if self._adb.wait_for_device():
             logger.info("设备已重新就绪")
