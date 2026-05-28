@@ -1,0 +1,11 @@
+# 竞品销量纯视觉自动化统计系统 — Python 依赖
+numpy>=1.24.0
+opencv-python>=4.8.0
+paddleocr>=2.7.0
+paddlepaddle>=2.5.0
+imagehash>=4.3.1
+pillow>=10.0.0
+requests>=2.31.0
+pyyaml>=6.0
+pymysql>=1.1.0
+schedule>=1.2.0

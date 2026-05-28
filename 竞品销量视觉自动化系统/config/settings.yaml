@@ -1,0 +1,55 @@
+# 竞品销量纯视觉自动化统计系统 — 全局配置
+# 生产环境可通过环境变量覆盖 ${ENV_VAR:default}
+
+adb:
+  device_serial: null       # null = 自动检测第一台设备
+  adb_path: "adb"
+  scrcpy_path: "scrcpy"
+
+scrcpy:
+  max_size: 1080            # 最大边长
+  max_fps: 15
+  bit_rate: "8M"
+  stay_awake: true
+
+queue:
+  max_size: 10              # 有界阻塞队列容量上限
+  low_watermark: 7          # 低于此值时唤醒生产者
+  producer_block_timeout: 30  # 生产者最长阻塞秒数，超时自动降级
+
+session:
+  state_file: "state/session_state.json"
+
+watchdog:
+  check_interval: 5         # 健康检查间隔 (秒)
+  scrcpy_restart_wait: 3    # scrcpy 重启后等待帧稳定时间
+  reconnect_retries: 3      # 连续失败多少次后告警
+  wireless_fallback: true   # USB 断开后尝试无线 ADB 兜底
+
+slide:
+  min_pause: 1.5            # 滑动后最小停顿 (秒)
+  max_pause: 4.0            # 滑动后最大停顿 (秒)
+  swipe_duration_min: 300   # 滑动手势最短耗时 (ms)
+  swipe_duration_max: 800   # 滑动手势最长耗时 (ms)
+
+ollama:
+  base_url: "http://localhost:11434"
+  model: "qwen2.5:7b"
+  num_predict: 32
+  temperature: 0
+  keepalive: -1             # -1 = 跑盘周期内常驻
+
+account_pool:
+  stores_per_account: 3     # 每个小号最多采集几个店铺后切换
+
+database:
+  host: "localhost"
+  port: 3306
+  user: "root"
+  password: ""
+  database: "competitor_monitor"
+
+timing:
+  sweep_start: "02:00"
+  sweep_end: "04:00"
+  max_sweep_duration: 9000  # 最大跑盘时长 (秒) = 2.5h
