@@ -103,3 +103,101 @@ class LazyLoadFilter:
             return float(np.var(gray))
         except Exception:
             return 0.0
+
+    # ── V5.0 骨架屏升级防御 ──────────────────────────────────
+
+    def is_skeleton_screen(self, card: dict,
+                           templates: list | None = None,
+                           ssim_threshold: float = 0.85,
+                           sobel_threshold: float = 50.0) -> bool:
+        """SSIM 模板匹配 + Sobel 边缘梯度 双重拦截骨架屏。
+
+        Args:
+            card: 商品卡片 dict，含 image/sales 子图
+            templates: 骨架屏模板图像列表
+            ssim_threshold: SSIM 高于此值判定无效
+            sobel_threshold: Sobel 梯度方差低于此值判定无效
+
+        Returns:
+            True 表示命中骨架屏特征，应丢弃
+        """
+        try:
+            import cv2
+            import numpy as np
+        except ImportError:
+            return False
+
+        sales_roi = card.get("sales")
+        image_roi = card.get("image")
+
+        # 防御 1：SSIM 模板匹配
+        if templates and image_roi is not None:
+            for template in templates:
+                if self._calc_ssim(image_roi, template) > ssim_threshold:
+                    logger.debug("SSIM 命中骨架屏模板")
+                    return True
+
+        # 防御 2：Sobel 边缘梯度检查
+        if sales_roi is not None:
+            grad_var = self._calc_sobel_variance(sales_roi)
+            if grad_var < sobel_threshold:
+                logger.debug("Sobel 梯度方差过低: %.1f < %.0f",
+                             grad_var, sobel_threshold)
+                return True
+
+        return False
+
+    @staticmethod
+    def _calc_ssim(img1, img2) -> float:
+        """计算两张图像的结构相似性（SSIM）。
+
+        简化实现：缩放至相同大小后计算归一化互相关系数。
+        """
+        try:
+            import cv2
+            import numpy as np
+        except ImportError:
+            return 0.0
+
+        try:
+            gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+            gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+
+            # 统一尺寸
+            h = min(gray1.shape[0], gray2.shape[0])
+            w = min(gray1.shape[1], gray2.shape[1])
+            gray1 = cv2.resize(gray1, (w, h))
+            gray2 = cv2.resize(gray2, (w, h))
+
+            # 归一化互相关系数
+            mean1, mean2 = gray1.mean(), gray2.mean()
+            std1, std2 = gray1.std(), gray2.std()
+
+            if std1 < 1e-6 or std2 < 1e-6:
+                return 1.0 if abs(mean1 - mean2) < 1e-6 else 0.0
+
+            corr = np.mean((gray1 - mean1) * (gray2 - mean2)) / (std1 * std2)
+            return float(max(0.0, min(1.0, corr)))
+        except Exception:
+            return 0.0
+
+    @staticmethod
+    def _calc_sobel_variance(img) -> float:
+        """计算 Sobel 边缘梯度方差。
+
+        渲染完毕的文字具有丰富的边缘纹理 → 高梯度方差。
+        骨架屏渐变色块无清晰边缘 → 低梯度方差。
+        """
+        try:
+            import cv2
+            import numpy as np
+        except ImportError:
+            return 1000.0
+
+        try:
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            grad_x = cv2.Sobel(gray, cv2.CV_16S, 1, 0, ksize=3)
+            grad_x_abs = cv2.convertScaleAbs(grad_x)
+            return float(np.var(grad_x_abs))
+        except Exception:
+            return 0.0

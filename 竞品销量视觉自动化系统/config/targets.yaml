@@ -1,0 +1,21 @@
+# 竞品销量纯视觉自动化统计系统 - 靶点池管理配置
+# V5.0: 禁止在 Python 核心代码中硬编码店铺信息
+
+global_settings:
+  scroll_interval_min: 1.5       # 仿生滑动最小停顿时间(秒)
+  scroll_interval_max: 3.5       # 仿生滑动最大停顿时间(秒)
+  max_backpressure_queue: 10     # 有界阻塞队列最大帧数
+  thermal_limit_celsius: 42.0    # 物理手机核心温度熔断阈值
+
+store_pool:
+  # Tier 1: 核心监控店铺（每日必跑，死盯微观订单事件流）
+  tier_1:
+    - store_name: "赣升江西三支一扶官方旗舰店"
+      keywords: ["江西三支一扶公基", "江西三支一扶申论课"]
+    - store_name: "皖拓教育官方店"
+      keywords: ["综合知识笔试课", "职业能力测试"]
+
+  # Tier 2: 宏观大盘监控店铺（间歇性运行，看整体折线斜率）
+  tier_2:
+    - store_name: "粉笔公考旗舰店"
+      keywords: ["行测全家桶", "申论批改"]
