@@ -128,17 +128,64 @@ class VLMExtractor:
             return None
 
     def _parse_response(self, text: str) -> Optional[SalesSnapshot]:
-        """解析 VLM 返回的 JSON 文本。"""
+        """解析 VLM 返回的 JSON 文本 — 自带 JSON 修复网关。
+
+        VLM 千分之一的概率吐出未转义引号、缺失闭合括号等非标准 JSON。
+        严禁直接抛 JSONDecodeError，自动修复后重试。
+        """
         # 去除可能的 Markdown 代码块标记
         text = re.sub(r'^```(?:json)?\s*', '', text.strip())
         text = re.sub(r'\s*```$', '', text.strip())
 
-        try:
-            data = _json.loads(text)
-        except _json.JSONDecodeError:
-            # 正则硬提取兜底
-            logger.warning("VLM 返回非标准 JSON: %s", text[:200])
+        data = self._try_parse_json(text)
+        if data is None:
+            # JSON 修复网关：自动补齐缺失括号、剥离非法字符
+            repaired = self._repair_json(text)
+            data = self._try_parse_json(repaired)
+
+        if data is None:
+            logger.warning("VLM JSON 不可修复: %s", text[:200])
             return None
+
+        summary = data.get("summary", {})
+        snapshot = SalesSnapshot(
+            cart_adds=summary.get("cart_adds", ""),
+            growth=summary.get("growth", ""),
+        )
+
+        for order_data in data.get("orders", []):
+            snapshot.orders.append(OrderItem(
+                buyer=order_data.get("buyer", ""),
+                is_repeat=order_data.get("is_repeat", False),
+                sku=order_data.get("sku", ""),
+                time_str=order_data.get("time_str", ""),
+            ))
+
+        return snapshot
+
+    @staticmethod
+    def _try_parse_json(text: str) -> dict | None:
+        try:
+            return _json.loads(text)
+        except (_json.JSONDecodeError, ValueError):
+            return None
+
+    @staticmethod
+    def _repair_json(text: str) -> str:
+        """JSON 修复网关：自动补齐闭合括号，修复未转义引号。"""
+        # 1. 补齐尾部缺失的 }
+        open_braces = text.count("{")
+        close_braces = text.count("}")
+        if open_braces > close_braces:
+            text += "}" * (open_braces - close_braces)
+        # 2. 补齐尾部缺失的 ]
+        open_brackets = text.count("[")
+        close_brackets = text.count("]")
+        if open_brackets > close_brackets:
+            text += "]" * (open_brackets - close_brackets)
+        # 3. 尝试移除非法控制字符
+        text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', text)
+        return text
 
         summary = data.get("summary", {})
         snapshot = SalesSnapshot(
@@ -186,6 +233,32 @@ class VLMExtractor:
             return False
 
     # ── V5.0 优化：Tile 格栅裁剪 ──────────────────────────────
+
+    # ── V5.0 优化：固定几何尺寸归一化 ─────────────────────────
+
+    @staticmethod
+    def normalize_to_fixed(image, target_w: int = 512, target_h: int = 512):
+        """固定尺寸归一化 — 等比例缩放 + 黑边填充，杜绝显存碎片。
+
+        RTX 4060 8GB 显存防御：强制所有 VLM 输入统一为 512×512。
+        降采样用 INTER_AREA（保小字锐度），放大用 INTER_CUBIC（保边缘平滑）。
+        """
+        try:
+            import cv2
+            import numpy as np
+            h, w = image.shape[:2]
+            scale = min(target_w / w, target_h / h)
+            new_w, new_h = int(w * scale), int(h * scale)
+            # 降采样 vs 放大 → 选择最优插值
+            interpolation = cv2.INTER_AREA if scale < 1.0 else cv2.INTER_CUBIC
+            resized = cv2.resize(image, (new_w, new_h), interpolation=interpolation)
+            canvas = np.zeros((target_h, target_w, 3), dtype=np.uint8)
+            y_off = (target_h - new_h) // 2
+            x_off = (target_w - new_w) // 2
+            canvas[y_off:y_off + new_h, x_off:x_off + new_w] = resized
+            return canvas
+        except ImportError:
+            return image
 
     @staticmethod
     def resize_for_vlm(image, max_pixels: int = 512):

@@ -32,3 +32,14 @@ PARTITION BY RANGE (TO_DAYS(order_date)) (
     PARTITION p2025_12 VALUES LESS THAN (TO_DAYS('2026-01-01')),
     PARTITION p_future    VALUES LESS THAN MAXVALUE
 );
+
+-- 11.1 日聚合离线表：OLTP/OLAP 读写分离
+CREATE TABLE IF NOT EXISTS daily_sku_sales_summary (
+    id          BIGINT          AUTO_INCREMENT PRIMARY KEY,
+    virtual_id  VARCHAR(64)     NOT NULL,
+    sku_name    VARCHAR(128)    NOT NULL,
+    sales_count INT             NOT NULL DEFAULT 0,
+    record_date DATE            NOT NULL,
+    UNIQUE KEY uk_sku_date (virtual_id, sku_name, record_date),
+    INDEX idx_record_date (record_date)
+) ENGINE=InnoDB;

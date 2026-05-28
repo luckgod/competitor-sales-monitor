@@ -4,9 +4,11 @@
 - 严禁高频开关 adb.exe 进程
 - 初始化时建立持久化 subprocess.Popen 管道
 - 通过 stdin.write 持续注入指令
+- stdin 写入受 threading.Lock 保护，防止多线程交织
 """
 import logging
 import subprocess
+import threading
 import time
 
 logger = logging.getLogger(__name__)
@@ -32,6 +34,7 @@ class ADBPipeline:
         self._serial = device_serial
         self._proc: subprocess.Popen | None = None
         self._started = False
+        self._stdin_lock = threading.Lock()  # 防止多线程交织写入
 
     def start(self) -> bool:
         """启动持久化 ADB Shell 管道。"""
@@ -133,11 +136,13 @@ class ADBPipeline:
             logger.warning("ADB 管道未启动")
             return
         try:
-            self._proc.stdin.write(cmd)
-            self._proc.stdin.flush()
+            with self._stdin_lock:
+                self._proc.stdin.write(cmd)
+                self._proc.stdin.flush()
         except (BrokenPipeError, OSError):
             logger.warning("ADB 管道断开，尝试重连")
             self._started = False
             if self.start():
-                self._proc.stdin.write(cmd)
-                self._proc.stdin.flush()
+                with self._stdin_lock:
+                    self._proc.stdin.write(cmd)
+                    self._proc.stdin.flush()
