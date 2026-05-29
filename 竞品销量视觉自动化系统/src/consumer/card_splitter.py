@@ -81,38 +81,50 @@ class CardSplitter:
             return []
 
     def _split_by_contour(self, frame) -> list[dict]:
-        """基于轮廓检测的卡片切分。"""
+        """V5.1 语义轮廓切分 — Y轴安全区 + 形态学膨胀 + 触线丢弃。"""
         try:
             import cv2
             import numpy as np
         except ImportError:
             return self._split_by_grid(frame)
 
+        sh, sw = self._screen_height, self._screen_width
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        edges = cv2.Canny(gray, 50, 150)
-        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # 形态学操作：膨胀连接卡片边缘断点
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (10, 10))
+        morph = cv2.morphologyEx(gray, cv2.MORPH_CLOSE, kernel)
+
+        edges = cv2.Canny(morph, 30, 150)
+        dilated = cv2.dilate(edges, None, iterations=2)
+        contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Y轴安全区
+        SAFE_ZONE_TOP = int(sh * 0.18)
+        SAFE_ZONE_BOTTOM = int(sh * 0.90)
+        min_area = (sw * sh) * 0.015
 
         cards = []
-        min_area = (self._screen_width * self._screen_height) * 0.02
-
         for cnt in contours:
             x, y, w, h = cv2.boundingRect(cnt)
             area = w * h
-            aspect = w / max(h, 1)
 
-            if area < min_area or aspect < 0.3 or aspect > 3.0:
+            # 面积过滤
+            if area < min_area or area > (sw * sh * 0.85):
                 continue
-            if h < self._screen_height * 0.08:
+            # 形状过滤：太扁的横向条（导航栏/广告横幅）
+            if w > h * 1.5 and h < sh * 0.10:
+                continue
+            if h < sh * 0.06:
                 continue
 
-            # 去重：相近位置的卡片合并
-            cards.append({
-                "x": x, "y": y, "w": w, "h": h,
-                "area": area,
-            })
+            # 【核心修复】Y轴安全区触线判定：拒绝残缺的半截卡片
+            if y < SAFE_ZONE_TOP or (y + h) > SAFE_ZONE_BOTTOM:
+                continue
 
-        # 按 y 坐标排序（从上到下），同行的按 x 排序
-        # 动态分桶：用平均卡片高度的 1/3 作为行容差，适配不同 UI 布局
+            cards.append({"x": x, "y": y, "w": w, "h": h, "area": area})
+
+        # 按 y 坐标排序
         avg_h = sum(c["h"] for c in cards) / max(len(cards), 1)
         row_tolerance = max(int(avg_h / 3), 10)
         cards.sort(key=lambda c: (c["y"] // row_tolerance, c["x"]))
