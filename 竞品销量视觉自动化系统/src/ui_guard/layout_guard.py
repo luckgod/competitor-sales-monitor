@@ -123,6 +123,12 @@ class LayoutGuard:
     def _trigger(self, reason: str) -> None:
         self._killed = True
         logger.critical("UI 改版熔断锁触发: %s", reason)
+        # 触发全局数据库写入熔断
+        try:
+            from ..db.killswitch import trigger as kt
+            kt(reason)
+        except ImportError:
+            pass
         for cb in self._on_killswitch:
             try:
                 cb(f"UI 布局可能改版: {reason}")

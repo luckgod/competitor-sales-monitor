@@ -270,7 +270,7 @@ class VLMExtractor:
         try:
             import cv2
             h, w = image.shape[:2]
-            scale = max_pixels / max(h, w)
+            scale = max_pixels / max(h, w, 1)
             if scale < 1.0:
                 return cv2.resize(image, (int(w * scale), int(h * scale)))
         except ImportError:

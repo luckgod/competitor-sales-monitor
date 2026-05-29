@@ -98,8 +98,8 @@ class SharedMemoryBridge:
         if self._shm is not None:
             try:
                 self._shm.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("共享内存close异常: %s", e)
             self._buffer = None
 
     def unlink(self) -> None:
@@ -111,8 +111,8 @@ class SharedMemoryBridge:
         if self._shm is not None:
             try:
                 self._shm.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("共享内存close异常(unlink): %s", e)
             try:
                 self._shm.unlink()
             except FileNotFoundError:

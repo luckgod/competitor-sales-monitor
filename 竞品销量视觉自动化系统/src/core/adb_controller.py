@@ -105,17 +105,17 @@ class ADBController:
 
     def launch_scrcpy(self, max_size: int = 1080, max_fps: int = 15,
                       bit_rate: str = "8M", stay_awake: bool = True,
-                      stealth_mode: bool = True) -> subprocess.Popen:
+                      stealth_mode: bool = False) -> subprocess.Popen:
         """启动 scrcpy 视频流进程。
 
         Args:
-            stealth_mode: True 时使用正向端口转发替代默认反向隧道（V5.0 反端口审计）。
+            stealth_mode: True 时执行 adb forward 替代默认反向隧道（V5.0 反端口审计）。
+                          不传 --tcpip 给 scrcpy，让它走默认 ADB 连接。
         """
         self.kill_scrcpy()
 
-        tunnel_port = None
         if stealth_mode:
-            tunnel_port = self.setup_stealth_tunnel()
+            self.setup_stealth_tunnel()
 
         args = [
             self._scrcpy,
@@ -123,12 +123,9 @@ class ADBController:
             f"--max-fps={max_fps}",
             f"--video-bit-rate={bit_rate}",
             "--no-audio",
-            "--stay-awake",
             "--disable-screensaver",
         ]
 
-        if tunnel_port:
-            args.extend(["--tcpip=127.0.0.1:" + tunnel_port])
         if stay_awake:
             args.append("--stay-awake")
         if self._serial:
@@ -252,12 +249,15 @@ class ADBController:
             prev_x, prev_y = px, py
 
     def capture_screenshot(self, output_path: str) -> bool:
-        """截取当前屏幕并拉取到本地。"""
+        """截取当前屏幕并拉取到本地（二进制安全）。"""
+        import subprocess as _sp
         remote_path = "/sdcard/screenshot_tmp.png"
         self._run_adb(["shell", "screencap", "-p", remote_path])
-        result = self._run_adb(["pull", remote_path, output_path], capture=True)
+        # pull 是二进制操作，不能用 text=True
+        cmd = self._adb_prefix() + ["pull", remote_path, output_path]
+        _sp.run(cmd, capture_output=True, timeout=15)
         self._run_adb(["shell", "rm", remote_path])
-        return "pulled" in result.lower() or Path(output_path).exists()
+        return Path(output_path).exists()
 
     # ── 内部工具 ──────────────────────────────────────────────
 

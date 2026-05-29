@@ -89,10 +89,15 @@ class CompetitorRepository:
         """写入当日销量快照。
 
         若 (virtual_id, record_date) 已存在则静默跳过（联合唯一索引约束）。
+        若全局熔断已触发则拒绝写入。
 
         Returns:
-            True 表示写入成功，False 表示重复被跳过。
+            True 表示写入成功，False 表示重复被跳过或熔断拒绝。
         """
+        from .killswitch import is_killed
+        if is_killed():
+            logger.warning("熔断已触发，拒绝写入: %s / %s", virtual_id, record_date)
+            return False
         try:
             self._execute(
                 """INSERT INTO rolling_sales_history

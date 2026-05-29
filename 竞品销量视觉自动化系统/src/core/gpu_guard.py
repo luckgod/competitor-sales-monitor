@@ -130,7 +130,7 @@ class GPUGuard:
                     status.available = True  # 至少 Ollama 在运行
                 return
         except Exception:
-            pass
+            logger.warning("Ollama 健康检查请求失败")
 
         status.warnings.append("Ollama 服务未响应，VLM 将不可用")
 

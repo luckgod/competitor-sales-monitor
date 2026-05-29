@@ -10,10 +10,36 @@ global_settings:
 store_pool:
   # Tier 1: 核心监控店铺（每日必跑，死盯微观订单事件流）
   tier_1:
-    - store_name: "赣升江西三支一扶官方旗舰店"
-      keywords: ["江西三支一扶公基", "江西三支一扶申论课"]
-    - store_name: "皖拓教育官方店"
-      keywords: ["综合知识笔试课", "职业能力测试"]
+    - store_name: "朱公子上岸教育"
+    - store_name: "百通教育专营店"
+    - store_name: "思小白教育旗舰店"
+    - store_name: "铭云顶旗舰店"
+    - store_name: "拜相云旗舰店"
+    - store_name: "精培教育旗舰店"
+    - store_name: "秦论教育旗舰店"
+    - store_name: "孟寻教育旗舰店"
+    - store_name: "私藏小课"
+    - store_name: "海娇教育"
+    - store_name: "易上岸教育"
+    - store_name: "牛赞学堂旗舰店"
+    - store_name: "众启源教育旗舰店"
+    - store_name: "江薇教育旗舰店"
+    - store_name: "中维远店铺"
+    - store_name: "亚昂教育旗舰店"
+    - store_name: "鼎贤教育旗舰店"
+    - store_name: "彬途教育旗舰店"
+    - store_name: "育吉教育旗舰店"
+    - store_name: "袁鸿教育"
+    - store_name: "卓考教育旗舰店"
+    - store_name: "赵帆教育旗舰店"
+    - store_name: "苏彤教育旗舰"
+    - store_name: "大飞学长旗舰"
+    - store_name: "救命稻草旗舰店"
+    - store_name: "神峪旗舰店"
+    - store_name: "叶一文店铺"
+    - store_name: "元宋店铺"
+    - store_name: "王一扬教育旗舰店"
+    - store_name: "言松教育旗舰店"
 
   # Tier 2: 宏观大盘监控店铺（间歇性运行，看整体折线斜率）
   tier_2:
