@@ -48,15 +48,16 @@ class AnchorSlicer:
         self._anchors = []
         for t in results:
             text, conf, bbox = t[1], t[2], t[0]
-            if conf < 0.4:
+            if conf < 0.35:
                 continue
 
-            # 严格价格锚点：必须有销量/价格关键词
-            price_keywords = {'人付款', '付款', '已售', '月销', '¥', '￥'}
+            # 价格锚点：销量关键词或货币符号
+            price_keywords = {'人付款', '付款', '已售', '月销', '¥', '￥', '元'}
             is_price = any(kw in text for kw in price_keywords)
-            # 也接受含¥/￥符号的纯价格数字
+            # 也接受"数字+付款"组合(OCR可能把"¥"读漏)
             if not is_price:
-                is_price = ('¥' in text or '￥' in text) and any(c.isdigit() for c in text)
+                has_digit = any(c.isdigit() for c in text)
+                is_price = has_digit and any(kw in text for kw in ['付款','人付款','已售'])
 
             if not is_price:
                 continue

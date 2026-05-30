@@ -1,0 +1,42 @@
+[
+  {
+    "store": "朱公子上岸教育",
+    "entered": false,
+    "activity": "com.taobao.search.sf.InshopResultActivity}"
+  },
+  {
+    "store": "百通教育专营店",
+    "entered": false,
+    "activity": "com.taobao.android.detail.alittdetail.TTDetailActi"
+  },
+  {
+    "store": "思小白教育旗舰店",
+    "entered": false,
+    "activity": "com.taobao.android.detail.alittdetail.TTDetailActi"
+  },
+  {
+    "store": "铭云顶旗舰店",
+    "entered": false,
+    "activity": "com.taobao.android.detail.alittdetail.TTDetailActi"
+  },
+  {
+    "store": "拜相云旗舰店",
+    "entered": false,
+    "activity": "com.taobao.android.detail.alittdetail.TTDetailActi"
+  },
+  {
+    "store": "精培教育旗舰店",
+    "entered": false,
+    "activity": "com.taobao.android.detail.alittdetail.TTDetailActi"
+  },
+  {
+    "store": "秦论教育旗舰店",
+    "entered": false,
+    "activity": "com.taobao.android.detail.alittdetail.TTDetailActi"
+  },
+  {
+    "store": "孟寻教育旗舰店",
+    "entered": false,
+    "activity": "com.taobao.android.detail.alittdetail.TTDetailActi"
+  }
+]
